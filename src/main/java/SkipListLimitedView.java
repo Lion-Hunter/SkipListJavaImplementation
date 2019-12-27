@@ -3,7 +3,7 @@ import java.util.*;
 public class SkipListLimitedView<T extends Comparable<T>> implements SortedSet<T> {
     private T lowerLimit;
     private T upperLimit;
-    private SkipList<T> delegate;
+    public SkipList<T> delegate;
 
     public SkipListLimitedView(SkipList<T> skipList, T from, T to) {
         this.delegate = skipList;
@@ -11,7 +11,7 @@ public class SkipListLimitedView<T extends Comparable<T>> implements SortedSet<T
         this.upperLimit = to;
     }
 
-    private boolean inBounds(T t) {
+    public boolean inBounds(T t) {
         return (lowerLimit == null || t.compareTo(this.lowerLimit) >= 0)
                 && (upperLimit == null || t.compareTo(this.upperLimit) <= 0);
     }
@@ -63,12 +63,18 @@ public class SkipListLimitedView<T extends Comparable<T>> implements SortedSet<T
             if (inBounds(t)) return t;
         }
 
-        throw new NoSuchElementException();
+        return null;
     }
 
     @Override
     public T last() {
-        return  null;
+        T lastElem = null;
+        for (T t : delegate) {
+            if (!inBounds(t) || this.last() == t) return lastElem;
+            lastElem = t;
+        }
+
+        return lastElem;
     }
 
     @Override
@@ -98,20 +104,27 @@ public class SkipListLimitedView<T extends Comparable<T>> implements SortedSet<T
     }
 
     public class LimitedIterator implements Iterator<T> {
+        T nextElem;
         Iterator<T> iterator;
 
         public LimitedIterator() {
             this.iterator = delegate.iterator();
+            nextElem = delegate.first();
         }
 
         @Override
         public boolean hasNext() {
-            throw new UnsupportedOperationException();
+            return this.iterator.hasNext() && this.iterator.next().compareTo(first()) >= 0
+                    && this.iterator.next().compareTo(last()) < 0;
         }
 
         @Override
         public T next() {
-        return null;
+            if (iterator.hasNext()) {
+                nextElem = delegate.tailSet(nextElem).first();
+            }
+
+            return nextElem;
         }
     }
 

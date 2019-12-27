@@ -50,8 +50,11 @@ public class SkipList<T extends Comparable<T>> implements SortedSet<T> {
 
     @Override
     public T last() {
+        if (this.size() == 0) throw new NullPointerException();
+        if (head.addresses.isEmpty()) return head.value;
+
         Node<T> curNode = head;
-        while (curNode.addresses.get(0) != null) {
+        while (!curNode.addresses.isEmpty() && curNode.addresses.get(0) != null) {
             curNode = curNode.addresses.get(0);
         }
 
@@ -83,6 +86,7 @@ public class SkipList<T extends Comparable<T>> implements SortedSet<T> {
 
         @Override
         public boolean hasNext() {
+            if (curNode.addresses.isEmpty()) return false;
             return curNode.addresses.get(0) != null;
         }
 
@@ -110,7 +114,7 @@ public class SkipList<T extends Comparable<T>> implements SortedSet<T> {
             int i = 1;
 
 
-            while (curNode.addresses.get(0) != null) {
+            while (!curNode.addresses.isEmpty() && curNode.addresses.get(0) != null) {
                 result[i] = curNode.addresses.get(0);
                 curNode = curNode.addresses.get(0);
                 i++;
@@ -144,29 +148,37 @@ public class SkipList<T extends Comparable<T>> implements SortedSet<T> {
             if (this.size == 0) return false;
 
             Node<T> curNode = this.head;
-            if (comparator().compare(curNode.value, (T) o) == 0) return true;
-
-            if (!curNode.addresses.isEmpty()) {
-                while (curNode.addresses.get(0) != null) {
-                    if (curNode.addresses.get(0).value == o) return true;
-                    curNode = curNode.addresses.get(0);
+            int i = head.addresses.size() - 1;
+            while (i > 0) {
+                if (comparator().compare(curNode.value, (T) o) < 0 || curNode.addresses.size() <= i) {
+                    curNode = curNode.addresses.get(i - 1);
+                    i--;
+                } else {
+                    curNode = curNode.addresses.get(i);
                 }
             }
-        }
 
+            while (!curNode.addresses.isEmpty() && ((Comparable) o).compareTo(curNode.addresses.get(0).value) >= 0) {
+                curNode = curNode.addresses.get(0);
+            }
+
+            if (comparator().compare((T) o, curNode.value) == 0) return true;
+        }
         return false;
     }
 
 
-    private void find (List<Node<T>> traceList, Node<T> curNode, Node<T> node, boolean choice) {
+    public Node<T> find (List<Node<T>> traceList, Node<T> curNode, Node<T> node, boolean choice) {
         int i = head.addresses.size() - 1;
         while (i > 0) {
-            if (node.value.compareTo(curNode.addresses.get(i).value) < 0) {
-                traceList.add(0, curNode);
-                curNode = curNode.addresses.get(i - 1);
-                i--;
-            } else {
-                curNode = curNode.addresses.get(i);
+            if (curNode.addresses.size() > i) {
+                if (node.value.compareTo(curNode.addresses.get(i).value) < 0) {
+                    traceList.add(0, curNode);
+                    curNode = curNode.addresses.get(i - 1);
+                    i--;
+                } else {
+                    curNode = curNode.addresses.get(i);
+                }
             }
         }
 
@@ -177,6 +189,8 @@ public class SkipList<T extends Comparable<T>> implements SortedSet<T> {
         }
 
         if (!choice) { traceList.add(0, lastNode); }
+
+        return curNode;
     }
 
 
@@ -202,11 +216,12 @@ public class SkipList<T extends Comparable<T>> implements SortedSet<T> {
                 head = node;
             } else {
                 List<Node<T>> traceList = new ArrayList<>();
-                Node<T> curNode = head;
+                Node<T> curNode = find(traceList, head, node, true);
 
-                find(traceList, curNode, node, true);
-
-                if (!curNode.addresses.isEmpty()) { curNode.addresses.set(0, node); }
+                if (!curNode.addresses.isEmpty()) {
+                    node.addresses.add(curNode.addresses.get(0));
+                    curNode.addresses.set(0, node);
+                }
                 else { curNode.addresses.add(node); }
 
                 for (int j = 0; j < traceList.size() - 1; j++) {
@@ -227,12 +242,16 @@ public class SkipList<T extends Comparable<T>> implements SortedSet<T> {
     public boolean remove(Object o) {
         if (this.size == 0) { throw new NullPointerException(); }
         if (!this.contains(o)){ return true; }
-        else if (size == 1) { head = null; }
+        else if (size == 1) {
+            head = null;
+            size = 0;
+            return true;
+        }
         else {
             Node<T> curNode = head;
             List<Node<T>> traceList = new ArrayList<>();
 
-            find(traceList, curNode, new Node<>((T) o), false);
+            find(traceList, head, new Node<>((T) o), false);
 
             traceList.get(0).addresses.set(0, curNode.addresses.get(0));
 
